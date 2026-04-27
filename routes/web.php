@@ -1,31 +1,40 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
-
-use App\Http\Controllers\ClientController;
-
-
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\ClientController;
+use App\Http\Controllers\ProfileController;
 
-Route::resource('invoices', InvoiceController::class);
-
-Route::resource('clients', ClientController::class);
+/*
+Public Route (tanpa login)
+*/
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('dashboard');
 });
 
-Route::get('/dashboard', [InvoiceController::class, 'dashboard'])
-    ->middleware(['auth'])
-    ->name('dashboard');
 
-Route::resource('invoices', InvoiceController::class);
+/*
+Protected Route (WAJIB LOGIN)
+*/
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth'])->group(function () {
+
+    // Dashboard
+    Route::get('/dashboard', [InvoiceController::class, 'dashboard'])
+        ->name('dashboard');
+
+    // Invoice
+    Route::resource('invoices', InvoiceController::class);
+
+    // Client
+    Route::resource('clients', ClientController::class);
+
+    // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
 });
 
 require __DIR__.'/auth.php';

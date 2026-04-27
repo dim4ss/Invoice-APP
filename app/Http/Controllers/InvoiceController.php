@@ -13,8 +13,8 @@ class InvoiceController extends Controller
     public function dashboard()
     {
         $invoices = Invoice::with(['client', 'items'])
-                    ->latest()
-                    ->get();
+            ->latest()
+            ->get();
 
         return view('dashboard', compact('invoices'));
     }
@@ -135,6 +135,7 @@ class InvoiceController extends Controller
         }
 
         return redirect()->route('dashboard');
+        with('success', 'Invoice berhasil diperbarui');
     }
 
     // HAPUS
