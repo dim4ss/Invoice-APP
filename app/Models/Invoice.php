@@ -17,11 +17,12 @@ class Invoice extends Model
     }
 
     protected $fillable = [
-        'client_id',
-        'invoice_number',
-        'date',
-        'subtotal',
-        'tax',
-        'total'
-    ];
+    'user_id',
+    'client_id',
+    'invoice_number',
+    'date',
+    'subtotal',
+    'tax',
+    'total',
+];
 }
