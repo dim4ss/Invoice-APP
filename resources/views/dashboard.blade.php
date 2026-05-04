@@ -82,6 +82,11 @@
         </div>
 
         <div style="display:flex; gap:5px;">
+
+            <a href="{{ route('invoices.print', $invoice->id) }}
+             "class="btn-blue-pdf"> Downdload PDF
+            </a>
+
             <button onclick="openModal({{ $invoice->id }})" class="btn-green-edit">
                 Edit
             </button>
@@ -208,6 +213,7 @@ window.onclick = function(e){
 .btn-red { background:red; color:white; padding:6px 10px; border:none; border-radius:5px; }
 .btn-blue { background:blue; color:white; padding:6px 10px; border:none; border-radius:5px; }
 .btn-gray { background:gray; color:white; padding:6px 10px; border:none; border-radius:5px; }
+.btn-blue-pdf { background:blue; color:white; padding:6px 10px; width: 140px; height: 37px; border:none; border-radius:5px; }
 
 /* MODAL */
 .modal {

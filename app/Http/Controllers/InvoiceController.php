@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Invoice;
 use App\Models\Client;
 use App\Models\InvoiceItem;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class InvoiceController extends Controller
 {
@@ -156,5 +157,17 @@ class InvoiceController extends Controller
 
         return redirect()->route('dashboard')
             ->with('success', 'Invoice berhasil dihapus');
+    }
+
+    // PDF
+    public function print($id)
+    {
+        $invoice = Invoice::with(['client', 'items'])
+            ->where('user_id', auth()->id()) 
+            ->findOrFail($id);
+
+        $pdf = Pdf::loadView('invoices.pdf', compact('invoice'));
+
+        return $pdf->download($invoice->invoice_number . '.pdf');
     }
 }

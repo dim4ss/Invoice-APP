@@ -71,7 +71,7 @@
     </div>
 </div>
 
-<!-- ================= CARD ================= -->
+<!--  CARD  -->
 <div class="invoice-box">
 
     <div class="invoice-header">
@@ -82,6 +82,11 @@
         </div>
 
         <div style="display:flex; gap:5px;">
+
+             <a href="{{ route('invoices.print', $invoice->id) }}
+             "class="btn-blue">PDF
+            </a>
+            
             <button onclick="openModal({{ $invoice->id }})" class="btn-green">
                 Edit
             </button>
@@ -128,7 +133,7 @@
 
 </div>
 
-<!-- ================= JS ================= -->
+<!-- JS  -->
 <script>
 function openModal(id){
     document.getElementById('modal-'+id).style.display = 'flex';
