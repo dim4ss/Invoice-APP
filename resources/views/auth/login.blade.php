@@ -43,5 +43,13 @@
                 {{ __('Log in') }}
             </x-primary-button>
         </div>
+        
+        <div style="margin-top:15px; text-align:center;">
+            Belum punya akun?
+            <a href="{{ route('register') }}"
+            style="color:blue; text-decoration:underline;">
+                Buat akun
+            </a>
+        </div>
     </form>
 </x-guest-layout>
