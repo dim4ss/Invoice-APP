@@ -1,0 +1,424 @@
+
+using System;
+using System.Windows.Forms;
+using MySql.Data.MySqlClient;
+
+namespace UKK_SPP
+{
+    public static class Koneksi
+    {
+        private static string connectionString = "server=localhost;port=3306;database=db_spp_sekolah_xii;user=root;password=;";
+
+        public static MySqlConnection GetConnection()
+        {
+            MySqlConnection conn = new MySqlConnection(connectionString);
+            try
+            {
+                conn.Open();
+                return conn;
+            }
+            catch (MySqlException ex)
+            {
+                MessageBox.Show("Gagal terhubung ke database! Pastikan server MySQL (XAMPP) sudah aktif.\n\nDetail Error: " + ex.Message, 
+                                "Error Koneksi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return null;
+            }
+        }
+    }
+}
+
+
+using System;
+
+namespace UKK_SPP
+{
+    public static class SessionUser
+    {
+        public static int IdPetugas { get; private set; }
+        public static string Username { get; private set; }
+        public static string NamaPetugas { get; private set; }
+        public static string Level { get; private set; }
+        public static bool IsLoggedIn { get; private set; }
+
+        public static void SetSession(int id, string username, string nama, string level)
+        {
+            IdPetugas = id;
+            Username = username;
+            NamaPetugas = nama;
+            Level = level.ToLower();
+            IsLoggedIn = true;
+        }
+
+        public static void ClearSession()
+        {
+            IdPetugas = 0;
+            Username = null;
+            NamaPetugas = null;
+            Level = null;
+            IsLoggedIn = false;
+        }
+
+        public static bool IsAdmin()
+        {
+            return Level == "admin";
+        }
+    }
+}
+
+
+
+3.
+using System;
+using System.Windows.Forms;
+using MySql.Data.MySqlClient;
+using BCrypt.Net;
+
+namespace UKK_SPP
+{
+    public partial class FormLogin : Form
+    {
+        public FormLogin()
+        {
+            InitializeComponent();
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.AcceptButton = btnLogin; // btnLogin diset sebagai AcceptButton
+            txtPassword.UseSystemPasswordChar = true;
+        }
+
+        private void btnLogin_Click(object sender, EventArgs e)
+        {
+            // 1. Validasi Input Kosong
+            if (string.IsNullOrWhiteSpace(txtUsername.Text))
+            {
+                MessageBox.Show("Username tidak boleh kosong!", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtUsername.Focus();
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(txtPassword.Text))
+            {
+                MessageBox.Show("Password tidak boleh kosong!", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtPassword.Focus();
+                return;
+            }
+
+            // Membuka Koneksi
+            using (MySqlConnection conn = Koneksi.GetConnection())
+            {
+                if (conn == null) return; // Keluar jika koneksi database gagal
+
+                // 2. Keamanan Kueri: Menggunakan Parameterized Query untuk mencegah SQL Injection
+                string query = "SELECT id_petugas, username, nama_petugas, password, level FROM petugas WHERE username = @username";
+                
+                using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@username", txtUsername.Text.Trim());
+
+                    using (MySqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            int id = reader.GetInt32("id_petugas");
+                            string username = reader.GetString("username");
+                            string nama = reader.GetString("nama_petugas");
+                            string dbPassword = reader.GetString("password");
+                            string level = reader.GetString("level");
+
+                            bool isPasswordValid = false;
+
+                            // 3. Verifikasi Hash Sandi dengan Fallback Handling
+                            if (dbPassword.StartsWith("$2a$") || dbPassword.StartsWith("$2y$") || dbPassword.StartsWith("$2b$"))
+                            {
+                                // Jika password di DB terenkripsi BCrypt
+                                try
+                                {
+                                    isPasswordValid = BCrypt.Net.BCrypt.Verify(txtPassword.Text, dbPassword);
+                                }
+                                catch
+                                {
+                                    isPasswordValid = false;
+                                }
+                            }
+                            else
+                            {
+                                // Fallback jika data seeder awal masih teks biasa (Plain Text)
+                                isPasswordValid = (txtPassword.Text == dbPassword);
+                            }
+
+                            // 4. Respon Otentikasi Kesuksesan
+                            if (isPasswordValid)
+                            {
+                                SessionUser.SetSession(id, username, nama, level);
+                                
+                                this.Hide();
+                                FormDashboard dashboard = new FormDashboard();
+                                dashboard.Show();
+                            }
+                            else
+                            {
+                                FailAuthResponse();
+                            }
+                        }
+                        else
+                        {
+                            FailAuthResponse();
+                        }
+                    }
+                }
+            }
+        }
+
+        private void FailAuthResponse()
+        {
+            MessageBox.Show("Username tidak ditemukan atau kata sandi salah!", "Gagal Login", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            txtPassword.Clear();
+            txtPassword.Focus();
+        }
+
+        private void btnBatal_Click(object sender, EventArgs e)
+        {
+            Application.Exit();
+        }
+
+        private void linkRegister_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            FormRegisterPetugas registerForm = new FormRegisterPetugas();
+            registerForm.ShowDialog();
+        }
+    }
+}
+
+4.
+using System;
+using System.Windows.Forms;
+using MySql.Data.MySqlClient;
+using BCrypt.Net;
+
+namespace UKK_SPP
+{
+    public partial class FormRegisterPetugas : Form
+    {
+        public FormRegisterPetugas()
+        {
+            InitializeComponent();
+            this.StartPosition = FormStartPosition.CenterScreen;
+            
+            // Set opsi ComboBox Level
+            cmbLevel.Items.Clear();
+            cmbLevel.Items.Add("petugas");
+            cmbLevel.Items.Add("admin");
+            cmbLevel.SelectedIndex = 0;
+
+            txtPassword.UseSystemPasswordChar = true;
+            txtKonfirmasiPassword.UseSystemPasswordChar = true;
+        }
+
+        private void btnSimpan_Click(object sender, EventArgs e)
+        {
+            // 2. Validasi input: seluruh field wajib terisi
+            if (string.IsNullOrWhiteSpace(txtUsername.Text) || 
+                string.IsNullOrWhiteSpace(txtNamaPetugas.Text) || 
+                string.IsNullOrWhiteSpace(txtPassword.Text) || 
+                string.IsNullOrWhiteSpace(txtKonfirmasiPassword.Text))
+            {
+                MessageBox.Show("Seluruh field wajib terisi!", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Kata sandi minimal 6 karakter
+            if (txtPassword.Text.Length < 6)
+            {
+                MessageBox.Show("Kata sandi minimal harus 6 karakter!", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtPassword.Focus();
+                return;
+            }
+
+            // Nilai pada txtPassword harus sama dengan txtKonfirmasiPassword
+            if (txtPassword.Text != txtKonfirmasiPassword.Text)
+            {
+                MessageBox.Show("Konfirmasi kata sandi tidak cocok!", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtKonfirmasiPassword.Focus();
+                return;
+            }
+
+            using (MySqlConnection conn = Koneksi.GetConnection())
+            {
+                if (conn == null) return;
+
+                // 3. Pengecekan Duplikasi Username via COUNT(*)
+                string checkQuery = "SELECT COUNT(*) FROM petugas WHERE username = @username";
+                using (MySqlCommand checkCmd = new MySqlCommand(checkQuery, conn))
+                {
+                    checkCmd.Parameters.AddWithValue("@username", txtUsername.Text.Trim());
+                    int userCount = Convert.ToInt32(checkCmd.ExecuteScalar());
+
+                    if (userCount > 0)
+                    {
+                        MessageBox.Show("Username sudah terdaftar! Gunakan username lain.", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        txtUsername.Focus();
+                        return;
+                    }
+                }
+
+                // 4. Enkripsi Data: Hash kata sandi menggunakan BCrypt
+                string hashedPassword = BCrypt.Net.BCrypt.HashPassword(txtPassword.Text);
+
+                // Insert ke database menggunakan Parameterized Query
+                string insertQuery = "INSERT INTO petugas (username, password, nama_petugas, level) VALUES (@username, @password, @nama, @level)";
+                using (MySqlCommand insertCmd = new MySqlCommand(insertQuery, conn))
+                {
+                    insertCmd.Parameters.AddWithValue("@username", txtUsername.Text.Trim());
+                    insertCmd.Parameters.AddWithValue("@password", hashedPassword);
+                    insertCmd.Parameters.AddWithValue("@nama", txtNamaPetugas.Text.Trim());
+                    insertCmd.Parameters.AddWithValue("@level", cmbLevel.SelectedItem.ToString());
+
+                    int rowsAffected = insertCmd.ExecuteNonQuery();
+                    if (rowsAffected > 0)
+                    {
+                        MessageBox.Show("Petugas baru berhasil didaftarkan!", "Sukses", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        this.Close();
+                    }
+                }
+            }
+        }
+
+        private void btnBatal_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+    }
+}
+
+
+5.
+
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+using MySql.Data.MySqlClient;
+
+namespace UKK_SPP
+{
+    public partial class FormDashboard : Form
+    {
+        public FormDashboard()
+        {
+            InitializeComponent();
+            this.StartPosition = FormStartPosition.CenterScreen;
+        }
+
+        private void FormDashboard_Load(object sender, EventArgs e)
+        {
+            // A.1 Proteksi Hak Akses & Session Guard
+            if (!SessionUser.IsLoggedIn)
+            {
+                MessageBox.Show("Akses ditolak! Silakan login terlebih dahulu.", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                this.Close();
+                Application.Exit();
+                return;
+            }
+
+            // A.2 Tampilkan identitas pengguna & badge status level
+            lblNamaPetugas.Text = SessionUser.NamaPetugas;
+            lblLevelBadge.Text = SessionUser.Level.ToUpper();
+
+            if (SessionUser.IsAdmin())
+            {
+                lblLevelBadge.ForeColor = Color.Green; // Teks hijau untuk ADMIN
+                
+                // A.3 RBAC: Jika pengguna adalah admin, seluruh menu aktif
+                btnKelolaSiswa.Enabled = true;
+                btnKelolaPetugas.Enabled = true;
+                btnKelolaSPP.Enabled = true;
+            }
+            else
+            {
+                lblLevelBadge.ForeColor = Color.Orange; // Teks oranye untuk PETUGAS
+                
+                // A.3 RBAC: Jika pengguna petugas, nonaktifkan tombol kelola petugas & SPP
+                btnKelolaSiswa.Enabled = true;
+                btnKelolaPetugas.Enabled = false; // Atau set Visible = false
+                btnKelolaSPP.Enabled = false;     // Atau set Visible = false
+            }
+
+            // B. Agregasi Metrik Real-Time
+            LoadMetrikDashboard();
+        }
+
+        private void LoadMetrikDashboard()
+        {
+            using (MySqlConnection conn = Koneksi.GetConnection())
+            {
+                if (conn == null) return;
+
+                try
+                {
+                    // Kartu 1: Total Siswa
+                    string qSiswa = "SELECT COUNT(*) FROM siswa";
+                    using (MySqlCommand cmd = new MySqlCommand(qSiswa, conn))
+                    {
+                        lblTotalSiswa.Text = cmd.ExecuteScalar().ToString();
+                    }
+
+                    // Kartu 2: Total Kelas
+                    string qKelas = "SELECT COUNT(*) FROM kelas";
+                    using (MySqlCommand cmd = new MySqlCommand(qKelas, conn))
+                    {
+                        lblTotalKelas.Text = cmd.ExecuteScalar().ToString();
+                    }
+
+                    // Kartu 3: Total Petugas
+                    string qPetugas = "SELECT COUNT(*) FROM petugas";
+                    using (MySqlCommand cmd = new MySqlCommand(qPetugas, conn))
+                    {
+                        lblTotalPetugas.Text = cmd.ExecuteScalar().ToString();
+                    }
+
+                    // Kartu 4: Penerimaan SPP Bulan Ini (Bulan dan Tahun Berjalan)
+                    string qSppBulanIni = "SELECT COALESCE(SUM(jumlah_bayar), 0) FROM pembayaran WHERE bulan_dibayar = @bulan AND tahun_dibayar = @tahun";
+                    using (MySqlCommand cmd = new MySqlCommand(qSppBulanIni, conn))
+                    {
+                        // Ambil parameter waktu secara dinamis dari sistem runtime saat ini (Tahun 2026)
+                        cmd.Parameters.AddWithValue("@bulan", DateTime.Now.ToString("MMMM")); // Menghasilkan nama bulan (misal: "November")
+                        cmd.Parameters.AddWithValue("@tahun", DateTime.Now.Year.ToString());
+
+                        decimal totalBayar = Convert.ToDecimal(cmd.ExecuteScalar());
+                        
+                        // Format angka menjadi mata uang Rupiah (contoh: Rp 250.000)
+                        lblSppBulanIni.Text = string.Format(System.Globalization.CultureInfo.GetCultureInfo("id-ID"), "Rp {0:N0}", totalBayar);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Gagal memuat beberapa statistik data real-time: " + ex.Message, "Error Metrik", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        // C. Navigasi & Logout
+        private void btnLogout_Click(object sender, EventArgs e)
+        {
+            DialogResult result = MessageBox.Show("Apakah Anda yakin ingin keluar?", "Konfirmasi Logout", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            
+            if (result == DialogResult.Yes)
+            {
+                // Bersihkan session
+                SessionUser.ClearSession();
+
+                // Tutup dashboard dan buka kembali FormLogin
+                this.Hide();
+                FormLogin loginForm = new FormLogin();
+                loginForm.Show();
+            }
+        }
+
+        // Mengantisipasi tombol close 'X' pada pojok form agar mematikan seluruh alur background thread aplikasi
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            base.OnFormClosing(e);
+            if (e.CloseReason == CloseReason.UserClosing && SessionUser.IsLoggedIn)
+            {
+                Application.Exit();
+            }
+        }
+    }
+}
