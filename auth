@@ -1,0 +1,53 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+class loginController extends Controller
+{
+    public function login()
+    {
+        return view('login');
+    }
+
+    public function authlogin(Request $request)
+    {
+    // validasi login
+    $dataLogin = $request->validate([
+            'username' => 'required', 
+            'password' => 'required',
+        ]);
+
+        // Laravel otomatis nyocokin username & password ke tabel 'petugas'
+        if (Auth::attempt($dataLogin)) {
+            
+            // buat tiket masuk  
+            $request->session()->regenerate();
+
+            // arahkan ke halmanan yang di inginkan
+            return redirect()->intended('/welcome');
+        }
+
+        // kembalikan kehalaman login dengan pesan error kalau gagal login
+        return back()->withErrors([
+            'username' => 'Username atau password salah nih.',
+        ])->onlyInput('username');
+    }
+
+    // 3. Proses keluar (Logout)
+    public function logout(Request $request)
+    {
+        // Hapus status login
+        Auth::logout();
+
+        // Hancurin tiket 
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        // Balik ke halaman login
+        return redirect('/login');
+    
+    }
+}
