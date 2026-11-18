@@ -1,0 +1,6 @@
+private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
+{
+    MySqlConnection con = new MySqlConnection(koneksi);
+        string query = "SELECT @role FORM tb_petugas";
+    MySqlCommand cmd = new MySqlCommand(query, con);
+}
