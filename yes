@@ -1,0 +1,62 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using MySql.Data.MySqlClient;
+
+namespace PRAKTIKUM1_DESKTOP_XII_0092726620_Muhamadrifqis
+{
+    public partial class FormRegister : Form
+    {
+        string koneksi = "server=localhost;password=;database=db_apotek_petugas;username=root";
+        public FormRegister()
+        {
+            InitializeComponent();
+            
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+                if (txtPassword == txtKonfirmasi)
+                {
+                    MessageBox.Show("password dan konfirmasi benar");
+                }
+                else
+                { MessageBox.Show("passsword dan konfirmasi tidaksama"); }
+
+            MySqlConnection configurasi = new MySqlConnection(this.koneksi);
+            try
+            {
+                configurasi.Open();
+                 
+                string query = "INSERT INTO tb_apoteker (username, password, role) VALUES (@username, @password, @role)";
+                MySqlCommand cmd = new MySqlCommand(query, configurasi);
+                cmd.CommandType = CommandType.Text;
+                cmd.Parameters.Add(new MySqlParameter("@username", txtUsername.Text));
+                cmd.Parameters.Add(new MySqlParameter("@password", txtPassword.Text));
+                cmd.Parameters.Add(new MySqlParameter("@role", comboBox1.SelectedItem.ToString()));
+
+                cmd.ExecuteNonQuery();
+                MessageBox.Show("Data Berhasil Disimpan", "Sukses", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                configurasi.Close();
+                MessageBox.Show("Gagal Menyimpan Data. Pesan Kesalahan: " + ex.Message, "Kesalahan", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            
+        }
+
+        private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            MySqlConnection con = new MySqlConnection(koneksi);
+                string query = "SELECT @role FORM tb_petugas";
+            MySqlCommand cmd = new MySqlCommand(query, con);
+        }
+    }
+}
