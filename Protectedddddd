@@ -1,0 +1,85 @@
+using System;
+using System.Windows.Forms;
+using MySql.Data.MySqlClient;
+
+namespace UKK_SPP
+{
+    public partial class FormLogin : Form
+    {
+        private string connectionString = "server=localhost;port=3306;database=db_spp_sekolah_xii;user=root;password=;";
+
+        public FormLogin()
+        {
+            InitializeComponent();
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.AcceptButton = btnLogin;
+            txtPassword.UseSystemPasswordChar = true;
+        }
+
+        private void btnLogin_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtUsername.Text))
+            {
+                MessageBox.Show("Username tidak boleh kosong!", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtUsername.Focus();
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(txtPassword.Text))
+            {
+                MessageBox.Show("Password tidak boleh kosong!", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtPassword.Focus();
+                return;
+            }
+
+            using (MySqlConnection conn = new MySqlConnection(connectionString))
+            {
+                try
+                {
+                    conn.Open();
+
+                    string query = "SELECT nama_petugas, level FROM petugas WHERE username = @username AND password = @password";
+                    using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@username", txtUsername.Text.Trim());
+                        cmd.Parameters.AddWithValue("@password", txtPassword.Text);
+
+                        using (MySqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                string nama = reader.GetString("nama_petugas");
+                                string level = reader.GetString("level");
+
+                                this.Hide();
+                                FormDashboard dashboard = new FormDashboard(nama, level);
+                                dashboard.Show();
+                            }
+                            else
+                            {
+                                MessageBox.Show("Username tidak ditemukan atau kata sandi salah!", "Gagal Login", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                txtPassword.Clear();
+                                txtPassword.Focus();
+                            }
+                        }
+                    }
+                }
+                catch (MySqlException ex)
+                {
+                    MessageBox.Show("Gagal terhubung ke database! Pastikan server MySQL (XAMPP) sudah aktif.\n\nDetail Error: " + ex.Message,
+                                    "Error Koneksi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void btnBatal_Click(object sender, EventArgs e)
+        {
+            Application.Exit();
+        }
+
+        private void linkRegister_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            FormRegisterPetugas registerForm = new FormRegisterPetugas();
+            registerForm.ShowDialog();
+        }
+    }
+}
