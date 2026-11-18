@@ -1,0 +1,99 @@
+using System;
+using System.Windows.Forms;
+using MySql.Data.MySqlClient;
+
+namespace UKK_SPP
+{
+    public partial class FormRegisterPetugas : Form
+    {
+        private string connectionString = "server=localhost;port=3306;database=db_spp_sekolah_xii;user=root;password=;";
+
+        public FormRegisterPetugas()
+        {
+            InitializeComponent();
+            this.StartPosition = FormStartPosition.CenterScreen;
+            
+            cmbLevel.Items.Clear();
+            cmbLevel.Items.Add("petugas");
+            cmbLevel.Items.Add("admin");
+            cmbLevel.SelectedIndex = 0;
+
+            txtPassword.UseSystemPasswordChar = true;
+            txtKonfirmasiPassword.UseSystemPasswordChar = true;
+        }
+
+        private void btnSimpan_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtUsername.Text) || 
+                string.IsNullOrWhiteSpace(txtNamaPetugas.Text) || 
+                string.IsNullOrWhiteSpace(txtPassword.Text) || 
+                string.IsNullOrWhiteSpace(txtKonfirmasiPassword.Text))
+            {
+                MessageBox.Show("Seluruh field wajib terisi!", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (txtPassword.Text.Length < 6)
+            {
+                MessageBox.Show("Kata sandi minimal harus 6 karakter!", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtPassword.Focus();
+                return;
+            }
+
+            if (txtPassword.Text != txtKonfirmasiPassword.Text)
+            {
+                MessageBox.Show("Konfirmasi kata sandi tidak cocok!", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtKonfirmasiPassword.Focus();
+                return;
+            }
+
+            using (MySqlConnection conn = new MySqlConnection(connectionString))
+            {
+                try
+                {
+                    conn.Open();
+
+                    string checkQuery = "SELECT COUNT(*) FROM petugas WHERE username = @username";
+                    using (MySqlCommand checkCmd = new MySqlCommand(checkQuery, conn))
+                    {
+                        checkCmd.Parameters.AddWithValue("@username", txtUsername.Text.Trim());
+                        int userCount = Convert.ToInt32(checkCmd.ExecuteScalar());
+
+                        if (userCount > 0)
+                        {
+                            MessageBox.Show("Username sudah terdaftar! Gunakan username lain.", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            txtUsername.Focus();
+                            return;
+                        }
+                    }
+
+                    string insertQuery = "INSERT INTO petugas (username, password, nama_petugas, level) VALUES (@username, @password, @nama, @level)";
+                    using (MySqlCommand insertCmd = new MySqlCommand(insertQuery, conn))
+                    {
+                        insertCmd.Parameters.AddWithValue("@username", txtUsername.Text.Trim());
+                        insertCmd.Parameters.AddWithValue("@password", txtPassword.Text);
+                        insertCmd.Parameters.AddWithValue("@nama", txtNamaPetugas.Text.Trim());
+                        insertCmd.Parameters.AddWithValue("@level", cmbLevel.SelectedItem.ToString());
+
+                        int rowsAffected = insertCmd.ExecuteNonQuery();
+                        if (rowsAffected > 0)
+                        {
+                            MessageBox.Show("Petugas baru berhasil didaftarkan!", "Sukses", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            this.Close();
+                        }
+                    }
+                }
+                catch (MySqlException ex)
+                {
+                    MessageBox.Show("Gagal terhubung ke database! Pastikan server MySQL (XAMPP) sudah aktif.\n\nDetail Error: " + ex.Message,
+                                    "Error Koneksi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void btnBatal_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+    }
+}
